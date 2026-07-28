@@ -1,6 +1,7 @@
 # goShelly-webUI
 
-Control Shelly Pro relays from a Raspberry Pi — over the web, or with physical buttons wired to the GPIO header.
+Control Shelly Pro relays from a Raspberry Pi — over the web, or with physical buttons wired to the GPIO header. 
+
 ---
 
 ## What it does
