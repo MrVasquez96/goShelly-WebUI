@@ -1,9 +1,6 @@
 # goShelly-webUI
 
 Control Shelly Pro relays from a Raspberry Pi — over the web, or with physical buttons wired to the GPIO header.
-
-A single static Go binary. No runtime dependencies, no cgo, no Python, no broker. It embeds its own web UI and talks to the relays directly over Shelly's Gen2 JSON-RPC.
-
 ---
 
 ## What it does
