@@ -1,0 +1,1332 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071015">
+  <title>Shelly Ctrl</title>
+  <meta name="description" content="Local Shelly Pro relay control and telemetry for Shelly systems.">
+
+  <style>
+    :root {
+      color-scheme: dark;
+
+      --bg: #071015;
+      --bg-raised: #0a151c;
+      --panel: #0d1a22;
+      --panel-2: #101f28;
+      --panel-3: #13242e;
+      --border: #20333e;
+      --border-strong: #2b4654;
+
+      --text: #eef7fa;
+      --text-soft: #bed0d7;
+      --muted: #7f98a3;
+      --muted-2: #5f7782;
+
+      --accent: #55d8ed;
+      --accent-soft: rgba(85, 216, 237, 0.12);
+      --success: #5bd48a;
+      --success-soft: rgba(91, 212, 138, 0.12);
+      --warning: #f5b85b;
+      --warning-soft: rgba(245, 184, 91, 0.12);
+      --danger: #f2747e;
+      --danger-soft: rgba(242, 116, 126, 0.12);
+
+      --radius-lg: 18px;
+      --radius-md: 13px;
+      --radius-sm: 9px;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% -20%, rgba(85, 216, 237, 0.10), transparent 38rem),
+        linear-gradient(180deg, #071015 0%, #060d12 100%);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.16;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black, transparent 72%);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+      border: 0;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      border-bottom: 1px solid rgba(43, 70, 84, 0.76);
+      background: rgba(7, 16, 21, 0.86);
+      backdrop-filter: blur(16px) saturate(120%);
+    }
+
+    .header-inner {
+      width: min(1440px, calc(100% - 40px));
+      min-height: 68px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 760;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
+      color: var(--accent);
+      background: linear-gradient(145deg, rgba(85, 216, 237, 0.12), rgba(85, 216, 237, 0.025));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .brand-mark svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-link,
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .header-link {
+      color: var(--text-soft);
+      font-size: 0.84rem;
+    }
+
+    .header-link:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.035);
+    }
+
+    .button {
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      background: var(--panel-2);
+      font-size: 0.82rem;
+      font-weight: 690;
+    }
+
+    .button:hover:not(:disabled) {
+      border-color: #3b6071;
+      background: var(--panel-3);
+      transform: translateY(-1px);
+    }
+
+    .button svg,
+    .header-link svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .button:disabled {
+      opacity: 0.48;
+      cursor: wait;
+    }
+
+    .layout {
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 40px 0 28px;
+    }
+
+    .page-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 24px;
+    }
+
+    .eyebrow {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--accent);
+      font: 700 0.68rem/1 var(--mono);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 7px;
+      font-size: clamp(2rem, 4vw, 3.35rem);
+      line-height: 1;
+      letter-spacing: -0.055em;
+    }
+
+    .page-heading p {
+      max-width: 680px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.96rem;
+      line-height: 1.6;
+    }
+
+    .scan-status {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 38px;
+      padding: 0 13px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-soft);
+      background: rgba(13, 26, 34, 0.74);
+      font: 0.72rem/1 var(--mono);
+      white-space: nowrap;
+    }
+
+    .scan-status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted-2);
+      box-shadow: 0 0 0 4px rgba(127, 152, 163, 0.08);
+    }
+
+    .scan-status.active::before {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft), 0 0 15px rgba(85, 216, 237, 0.55);
+      animation: pulse 1.1s ease-in-out infinite;
+    }
+
+    .scan-status.success::before {
+      background: var(--success);
+      box-shadow: 0 0 0 4px var(--success-soft);
+    }
+
+    .scan-status.error::before {
+      background: var(--danger);
+      box-shadow: 0 0 0 4px var(--danger-soft);
+    }
+
+    @keyframes pulse {
+      50% { opacity: 0.45; transform: scale(0.8); }
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .summary-card {
+      min-width: 0;
+      padding: 17px 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: linear-gradient(145deg, rgba(16, 31, 40, 0.95), rgba(10, 21, 28, 0.95));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
+    }
+
+    .summary-card span {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font: 650 0.64rem/1 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .summary-card strong {
+      display: block;
+      color: var(--text);
+      font-size: clamp(1.35rem, 2.6vw, 1.8rem);
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+
+    .summary-card small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted-2);
+      font-size: 0.74rem;
+    }
+
+    .global-error {
+      display: none;
+      margin: -8px 0 24px;
+      padding: 14px 16px;
+      border: 1px solid rgba(242, 116, 126, 0.36);
+      border-radius: var(--radius-md);
+      color: #ffd5d9;
+      background: var(--danger-soft);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .section-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-bar h2 {
+      margin-bottom: 0;
+      font-size: 1.12rem;
+      letter-spacing: -0.02em;
+    }
+
+    .refresh-interval {
+      color: var(--muted);
+      font: 0.68rem/1 var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .device-card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(150deg, rgba(16, 31, 40, 0.98), rgba(9, 20, 27, 0.98));
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.03);
+      transition: border-color 180ms ease, transform 180ms ease;
+    }
+
+    .device-card:hover {
+      border-color: #315060;
+      transform: translateY(-1px);
+    }
+
+    .device-card[aria-busy="true"] {
+      opacity: 0.78;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 19px 19px 16px;
+      border-bottom: 1px solid rgba(32, 51, 62, 0.78);
+    }
+
+    .identity {
+      min-width: 0;
+    }
+
+    .identity-topline {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-bottom: 6px;
+    }
+
+    .identity h3 {
+      margin: 0;
+      color: var(--text);
+      font-size: 1rem;
+      line-height: 1.25;
+      letter-spacing: -0.015em;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 23px;
+      padding: 0 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.025);
+      font: 650 0.6rem/1 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-badge.online {
+      border-color: rgba(91, 212, 138, 0.28);
+      color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .status-badge.offline {
+      border-color: rgba(242, 116, 126, 0.28);
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .device-meta,
+    .device-url {
+      overflow-wrap: anywhere;
+    }
+
+    .device-meta {
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.45;
+    }
+
+    .device-url {
+      margin-top: 3px;
+      color: var(--muted-2);
+      font: 0.67rem/1.4 var(--mono);
+    }
+
+    .icon-button {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-soft);
+      background: rgba(255,255,255,0.025);
+      cursor: pointer;
+      transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+    }
+
+    .icon-button:hover {
+      border-color: var(--border-strong);
+      color: var(--text);
+      background: rgba(255,255,255,0.045);
+    }
+
+    .icon-button svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .relay-control {
+      display: grid;
+      grid-template-columns: minmax(150px, 0.62fr) minmax(280px, 1fr);
+      align-items: center;
+      gap: 18px;
+      margin: 16px 19px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #09151c;
+    }
+
+    .state-label {
+      display: block;
+      color: var(--muted);
+      font: 650 0.61rem/1 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .state-value {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 7px;
+      color: var(--warning);
+      font: 760 1.35rem/1 var(--mono);
+      letter-spacing: 0.025em;
+    }
+
+    .state-value::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 15px currentColor;
+    }
+
+    .state-value.on { color: var(--success); }
+    .state-value.off { color: var(--muted); }
+    .state-value.unknown { color: var(--warning); }
+
+    .relay-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .relay-action {
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-soft);
+      background: var(--panel-2);
+      font: 700 0.68rem/1 var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 150ms ease, border-color 150ms ease, color 150ms ease, background 150ms ease;
+    }
+
+    .relay-action:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    .relay-action.on:hover:not(:disabled) {
+      border-color: rgba(91, 212, 138, 0.68);
+      color: #c7f6d7;
+      background: var(--success-soft);
+    }
+
+    .relay-action.off:hover:not(:disabled) {
+      border-color: rgba(242, 116, 126, 0.62);
+      color: #ffd2d6;
+      background: var(--danger-soft);
+    }
+
+    .relay-action.toggle:hover:not(:disabled) {
+      border-color: rgba(85, 216, 237, 0.64);
+      color: #d5f8fd;
+      background: var(--accent-soft);
+    }
+
+    .relay-action:disabled {
+      opacity: 0.34;
+      cursor: not-allowed;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      margin: 0 19px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--border);
+    }
+
+    .metric {
+      min-width: 0;
+      min-height: 78px;
+      padding: 13px 14px;
+      background: rgba(12, 26, 34, 0.98);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font: 620 0.59rem/1.25 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 10px;
+      color: var(--text);
+      font: 650 0.82rem/1.2 var(--mono);
+      overflow-wrap: anywhere;
+    }
+
+    .card-errors {
+      display: none;
+      margin: 14px 19px 0;
+      border: 1px solid rgba(242, 116, 126, 0.26);
+      border-radius: 11px;
+      background: var(--danger-soft);
+    }
+
+    .card-errors.has-errors {
+      display: block;
+    }
+
+    .card-errors summary {
+      padding: 11px 13px;
+      color: #ffc9ce;
+      cursor: pointer;
+      font-size: 0.77rem;
+      font-weight: 690;
+    }
+
+    .card-errors pre {
+      margin: 0;
+      padding: 0 13px 12px;
+      color: #efb3b9;
+      background: transparent;
+      font: 0.68rem/1.45 var(--mono);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 19px 17px;
+      color: var(--muted-2);
+      font: 0.64rem/1 var(--mono);
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      padding: 56px 24px;
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-lg);
+      color: var(--muted);
+      text-align: center;
+      background: rgba(13, 26, 34, 0.52);
+    }
+
+    .site-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      color: var(--muted-2);
+      font-size: 0.72rem;
+    }
+
+    .site-footer a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .site-footer a:hover {
+      color: var(--text-soft);
+    }
+
+    dialog {
+      width: min(960px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      color: var(--text);
+      background: var(--panel);
+      box-shadow: 0 35px 100px rgba(0,0,0,0.72);
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 5, 8, 0.78);
+      backdrop-filter: blur(6px);
+    }
+
+    .dialog-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+    }
+
+    .dialog-head strong {
+      font-size: 0.84rem;
+    }
+
+    .dialog-head button {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text-soft);
+      background: rgba(255,255,255,0.03);
+      cursor: pointer;
+    }
+
+    #details-json {
+      max-height: calc(100vh - 100px);
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      color: #c6dce4;
+      background: #081219;
+      font: 0.73rem/1.55 var(--mono);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 50;
+      width: min(380px, calc(100vw - 36px));
+      padding: 13px 15px;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      color: var(--text);
+      background: rgba(16, 31, 40, 0.98);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.48);
+      transform: translateY(16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 180ms ease, opacity 180ms ease;
+      font-size: 0.82rem;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      border-color: rgba(242, 116, 126, 0.42);
+      color: #ffd5d9;
+    }
+
+    @media (max-width: 1100px) {
+      .device-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .header-inner,
+      .layout {
+        width: min(100% - 24px, 1440px);
+      }
+
+      .header-inner {
+        min-height: 62px;
+      }
+
+      .header-link {
+        display: none;
+      }
+
+      .layout {
+        padding-top: 28px;
+      }
+
+      .page-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .relay-control {
+        grid-template-columns: 1fr;
+      }
+
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 480px) {
+      .brand {
+        font-size: 0.72rem;
+        letter-spacing: 0.13em;
+      }
+
+      .button span {
+        display: none;
+      }
+
+      .button {
+        width: 38px;
+        padding: 0;
+      }
+
+      .summary-card {
+        padding: 15px;
+      }
+
+      .card-head,
+      .relay-control,
+      .metrics,
+      .card-errors,
+      .card-footer {
+        margin-left: 14px;
+        margin-right: 14px;
+      }
+
+      .card-head {
+        margin: 0;
+        padding: 16px 14px 14px;
+      }
+
+      .relay-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .site-footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="#devices-panel" aria-label="Relay control home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M35 6L21 22h8l-4 12 14-16h-8l4-12z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
+
+        </span>
+        Shelly Ctrl
+      </a>
+
+      <div class="header-actions">
+
+        <a class="button" href="/gpio">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <rect x="7" y="7" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+          <span>GPIO &amp; buttons</span>
+        </a>
+
+        <button class="button" id="refresh-now" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 11a8.1 8.1 0 0 0-14.7-4M4 5v5h5M4 13a8.1 8.1 0 0 0 14.7 4M20 19v-5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="page-heading" aria-labelledby="page-title">
+      <div>
+        <span class="eyebrow">Local control</span>
+        <h1 id="page-title">Overview</h1>
+         </div>
+
+      <span class="scan-status" id="refresh-state">Awaiting first scan</span>
+    </section>
+
+    <section class="summary-grid" aria-label="Fleet summary">
+      <article class="summary-card">
+        <span>Devices</span>
+        <strong id="summary-devices">—</strong>
+        <small>Configured endpoints</small>
+      </article>
+
+      <article class="summary-card">
+        <span>Online</span>
+        <strong id="summary-online">—</strong>
+        <small>Responding now</small>
+      </article>
+
+      <article class="summary-card">
+        <span>Active relays</span>
+        <strong id="summary-active">—</strong>
+        <small>Channels switched on</small>
+      </article>
+
+      <article class="summary-card">
+        <span>Total load</span>
+        <strong id="summary-power">—</strong>
+        <small>Combined real power</small>
+      </article>
+    </section>
+
+    <div class="global-error" id="global-error" role="alert"></div>
+
+    <section id="devices-panel" aria-labelledby="devices-heading">
+      <div class="section-bar">
+        <h2 id="devices-heading">Relay channels</h2>
+        <span class="refresh-interval" id="refresh-interval">Refresh interval —</span>
+      </div>
+
+      <div id="devices" class="device-grid" aria-live="polite">
+        <div class="empty-state" id="loading-state">Scanning the local network relay devices…</div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <span>Relay control</span>
+        </footer>
+  </main>
+
+  <dialog id="details-dialog">
+    <div class="dialog-head">
+      <strong id="details-title">Device details</strong>
+      <button id="close-dialog" type="button">Close</button>
+    </div>
+    <pre id="details-json"></pre>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    /* Your server may replace __REFRESH_MS__ with a number. */
+    const REFRESH_MS = Number("__REFRESH_MS__") || 5000;
+
+    const cards = new Map();
+    const latestDevices = new Map();
+    const container = document.getElementById("devices");
+    const globalError = document.getElementById("global-error");
+    const dialog = document.getElementById("details-dialog");
+    const detailsTitle = document.getElementById("details-title");
+    const detailsJSON = document.getElementById("details-json");
+    const refreshState = document.getElementById("refresh-state");
+    const refreshButton = document.getElementById("refresh-now");
+    const toast = document.getElementById("toast");
+
+    let refreshInFlight = false;
+    let toastTimer;
+
+    document.getElementById("refresh-interval").textContent =
+      "Refresh every " + Math.max(1, Math.round(REFRESH_MS / 1000)) + "s";
+
+    document.getElementById("close-dialog").addEventListener("click", () => dialog.close());
+    refreshButton.addEventListener("click", () => refresh(true));
+
+    function showToast(message, isError = false) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.className = "toast show" + (isError ? " error" : "");
+      toastTimer = setTimeout(() => { toast.className = "toast"; }, 3200);
+    }
+
+    function text(value, fallback = "—") {
+      return value === undefined || value === null || value === "" ? fallback : String(value);
+    }
+
+    function fixed(value, digits = 1, unit = "") {
+      return typeof value === "number" && Number.isFinite(value)
+        ? value.toFixed(digits) + unit
+        : "—";
+    }
+
+    function duration(seconds) {
+      if (typeof seconds !== "number" || !Number.isFinite(seconds)) return "—";
+
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+
+      return [days ? days + "d" : "", hours ? hours + "h" : "", minutes + "m"]
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    async function requestJSON(path, options = {}) {
+      const response = await fetch(path, { cache: "no-store", ...options });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "HTTP " + response.status);
+      }
+
+      return data;
+    }
+
+    function metric(label, value) {
+      const box = document.createElement("div");
+      box.className = "metric";
+
+      const labelElement = document.createElement("span");
+      labelElement.textContent = label;
+
+      const valueElement = document.createElement("strong");
+      valueElement.textContent = value;
+
+      box.append(labelElement, valueElement);
+      return box;
+    }
+
+    function ensureCard(device) {
+      if (cards.has(device.id)) return cards.get(device.id);
+
+      document.getElementById("loading-state")?.remove();
+
+      const card = document.createElement("article");
+      card.className = "device-card";
+      card.innerHTML = `
+        <div class="card-head">
+          <div class="identity">
+            <div class="identity-topline">
+              <h3></h3>
+              <span class="status-badge offline">Offline</span>
+            </div>
+            <div class="device-meta"></div>
+            <div class="device-url"></div>
+          </div>
+
+          <button class="icon-button details" type="button" aria-label="Open complete device snapshot" title="Open complete snapshot">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h7L20 10.5v7A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-11Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M13 4v7h7M8 15h8M8 11h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="relay-control">
+          <div>
+            <span class="state-label">Relay switch:0</span>
+            <strong class="state-value unknown">Unknown</strong>
+          </div>
+
+          <div class="relay-actions">
+            <button class="relay-action on" type="button">On</button>
+            <button class="relay-action off" type="button">Off</button>
+            <button class="relay-action toggle" type="button">Toggle</button>
+          </div>
+        </div>
+
+        <div class="metrics"></div>
+
+        <details class="card-errors">
+          <summary>Device communication issue</summary>
+          <pre></pre>
+        </details>
+
+        <div class="card-footer">
+          <span class="updated"></span>
+          <span class="latency"></span>
+        </div>
+      `;
+
+      container.appendChild(card);
+
+      const refs = {
+        card,
+        title: card.querySelector("h3"),
+        badge: card.querySelector(".status-badge"),
+        model: card.querySelector(".device-meta"),
+        url: card.querySelector(".device-url"),
+        state: card.querySelector(".state-value"),
+        metrics: card.querySelector(".metrics"),
+        errors: card.querySelector(".card-errors"),
+        errorText: card.querySelector(".card-errors pre"),
+        updated: card.querySelector(".updated"),
+        latency: card.querySelector(".latency"),
+        on: card.querySelector(".relay-action.on"),
+        off: card.querySelector(".relay-action.off"),
+        toggle: card.querySelector(".relay-action.toggle"),
+        details: card.querySelector(".details")
+      };
+
+      refs.on.addEventListener("click", () => setRelay(device.id, true, refs));
+      refs.off.addEventListener("click", () => setRelay(device.id, false, refs));
+      refs.toggle.addEventListener("click", () => toggleRelay(device.id, refs));
+      refs.details.addEventListener("click", () => {
+        const latest = latestDevices.get(device.id);
+        showDetails(device.id, latest?.name || device.name);
+      });
+
+      cards.set(device.id, refs);
+      return refs;
+    }
+
+    function renderDevice(device) {
+      latestDevices.set(device.id, device);
+      const refs = ensureCard(device);
+
+      const info = device.device_info || {};
+      const status = device.status || {};
+      const relay = status["switch:0"] || {};
+      const system = status.sys || {};
+      const wifi = status.wifi || {};
+      const ethernet = status.eth || {};
+
+      refs.title.textContent = device.name;
+      refs.model.textContent = [
+        info.model,
+        info.app,
+        info.ver ? "firmware " + info.ver : ""
+      ].filter(Boolean).join(" · ") || "No device information";
+      refs.url.textContent = device.url;
+
+      refs.badge.textContent = device.online ? "Online" : "Offline";
+      refs.badge.className = "status-badge " + (device.online ? "online" : "offline");
+
+      const isOn = relay.output === true;
+      const isOff = relay.output === false;
+
+      refs.state.textContent = isOn ? "On" : isOff ? "Off" : "Unknown";
+      refs.state.className = "state-value " + (isOn ? "on" : isOff ? "off" : "unknown");
+
+      refs.on.disabled = !device.online || isOn;
+      refs.off.disabled = !device.online || isOff;
+      refs.toggle.disabled = !device.online;
+      refs.on.setAttribute("aria-pressed", String(isOn));
+      refs.off.setAttribute("aria-pressed", String(isOff));
+
+      refs.metrics.replaceChildren(
+        metric("Power", fixed(relay.apower, 1, " W")),
+        metric("Voltage", fixed(relay.voltage, 1, " V")),
+        metric("Current", fixed(relay.current, 3, " A")),
+        metric("Energy", fixed(relay.aenergy && relay.aenergy.total, 1, " Wh")),
+        metric("Temperature", fixed(relay.temperature && relay.temperature.tC, 1, " °C")),
+        metric("Frequency", fixed(relay.freq, 1, " Hz")),
+        metric("Network IP", text(ethernet.ip || wifi.sta_ip)),
+        metric("Uptime", duration(system.uptime)),
+        metric("Power factor", fixed(relay.pf, 3)),
+        metric("Wi-Fi RSSI", typeof wifi.rssi === "number" ? wifi.rssi + " dBm" : "—"),
+        metric("Last source", text(relay.source)),
+        metric("Switch cycles", text(relay.counts && relay.counts.switch_on))
+      );
+
+      const errors = [];
+      if (Array.isArray(relay.errors) && relay.errors.length) {
+        errors.push("Relay: " + relay.errors.join(", "));
+      }
+      if (device.errors) {
+        for (const [key, value] of Object.entries(device.errors)) {
+          errors.push(key + ": " + value);
+        }
+      }
+
+      refs.errorText.textContent = errors.join("\n");
+      refs.errors.classList.toggle("has-errors", errors.length > 0);
+      if (!errors.length) refs.errors.open = false;
+
+      refs.updated.textContent = device.retrieved_at
+        ? "Updated " + new Date(device.retrieved_at).toLocaleTimeString()
+        : "Update time unavailable";
+      refs.latency.textContent = typeof device.latency_ms === "number"
+        ? device.latency_ms + " ms"
+        : "— ms";
+    }
+
+    function reconcileCards(devices) {
+      const activeIds = new Set(devices.map(device => device.id));
+      for (const [id, refs] of cards) {
+        if (!activeIds.has(id)) {
+          refs.card.remove();
+          cards.delete(id);
+          latestDevices.delete(id);
+        }
+      }
+    }
+
+    function updateSummary(devices) {
+      const online = devices.filter(device => device.online).length;
+      const active = devices.filter(device => device.status?.["switch:0"]?.output === true).length;
+      const totalPower = devices.reduce((sum, device) => {
+        const value = device.status?.["switch:0"]?.apower;
+        return sum + (typeof value === "number" && Number.isFinite(value) ? value : 0);
+      }, 0);
+
+      document.getElementById("summary-devices").textContent = devices.length;
+      document.getElementById("summary-online").textContent = online + " / " + devices.length;
+      document.getElementById("summary-active").textContent = active;
+      document.getElementById("summary-power").textContent = totalPower.toFixed(1) + " W";
+    }
+
+    function setBusy(refs, busy) {
+      refs.card.setAttribute("aria-busy", busy ? "true" : "false");
+      refs.on.disabled = busy;
+      refs.off.disabled = busy;
+      refs.toggle.disabled = busy;
+    }
+
+    async function setRelay(id, on, refs) {
+      setBusy(refs, true);
+      try {
+        await requestJSON("/api/devices/" + encodeURIComponent(id) + "/relay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shelly-Control": "1" },
+          body: JSON.stringify({ on })
+        });
+
+        const name = latestDevices.get(id)?.name || "Relay";
+        showToast(name + " switched " + (on ? "on" : "off") + ".");
+        await refresh();
+      } catch (error) {
+        refs.errorText.textContent = error.message;
+        refs.errors.classList.add("has-errors");
+        showToast(error.message, true);
+      } finally {
+        setBusy(refs, false);
+      }
+    }
+
+    async function toggleRelay(id, refs) {
+      setBusy(refs, true);
+      try {
+        await requestJSON("/api/devices/" + encodeURIComponent(id) + "/toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shelly-Control": "1" },
+          body: "{}"
+        });
+
+        const name = latestDevices.get(id)?.name || "Relay";
+        showToast(name + " toggled.");
+        await refresh();
+      } catch (error) {
+        refs.errorText.textContent = error.message;
+        refs.errors.classList.add("has-errors");
+        showToast(error.message, true);
+      } finally {
+        setBusy(refs, false);
+      }
+    }
+
+    async function showDetails(id, name) {
+      detailsTitle.textContent = name + " — complete snapshot";
+      detailsJSON.textContent = "Loading…";
+      dialog.showModal();
+
+      try {
+        const data = await requestJSON("/api/devices/" + encodeURIComponent(id));
+        detailsJSON.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        detailsJSON.textContent = error.message;
+      }
+    }
+
+    async function refresh(manual = false) {
+      if (refreshInFlight) return;
+
+      refreshInFlight = true;
+      refreshButton.disabled = true;
+      refreshState.className = "scan-status active";
+      refreshState.textContent = "Scanning devices…";
+
+      try {
+        const data = await requestJSON("/api/devices");
+        const devices = Array.isArray(data.devices) ? data.devices : [];
+
+        globalError.style.display = "none";
+        globalError.textContent = "";
+
+        reconcileCards(devices);
+        for (const device of devices) renderDevice(device);
+        updateSummary(devices);
+
+        refreshState.className = "scan-status success";
+        refreshState.textContent = "Last scan " + new Date().toLocaleTimeString();
+
+        if (manual) showToast("Device scan complete.");
+
+        if (!devices.length) {
+          container.innerHTML = '<div class="empty-state" id="loading-state">No devices were returned by the local API.</div>';
+        }
+      } catch (error) {
+        globalError.textContent = error.message;
+        globalError.style.display = "block";
+        refreshState.className = "scan-status error";
+        refreshState.textContent = "Scan failed";
+        if (manual) showToast(error.message, true);
+      } finally {
+        refreshButton.disabled = false;
+        refreshInFlight = false;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, REFRESH_MS);
+  </script>
+</body>
+</html> 

@@ -1,0 +1,27 @@
+{
+  "listen": "0.0.0.0:8080",
+  "refresh_seconds": 5,
+  "request_timeout_seconds": 5,
+  "ui_username": "shelly",
+  "ui_password": "${SHELLY_UI_PASSWORD}",
+  "devices": [
+    {
+      "id": "main",
+      "name": "Main relay (083AF2BE073C)",
+      "url": "http://192.168.34.2"
+    },
+    {
+      "id": "secondary",
+      "name": "Secondary relay (FCE8C0D94728)",
+      "url": "http://192.168.34.1"
+    }
+  ],
+  "gpio": {
+    "enabled": true,
+    "chip": "gpiochip0",
+    "consumer": "goshelly",
+    "default_bias": "pull-up",
+    "debounce_ms": 20,
+    "bindings_path": "/home/pi/goshelly/bindings.json"
+  }
+}

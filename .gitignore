@@ -1,0 +1,12 @@
+# Built binaries
+/goshelly
+/goShelly-webUI
+*.exe
+
+# Runtime state written by the app on the Pi
+/bindings.json
+
+# Local secrets — never commit
+/env
+*.env
+config.local.json

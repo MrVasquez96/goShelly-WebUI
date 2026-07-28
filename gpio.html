@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071015">
+  <title>GPIO &amp; Buttons — Shelly Relay Control</title>
+  <meta name="description" content="Live Raspberry Pi GPIO visualizer and physical button bindings for Shelly relays.">
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071015;
+      --panel: #0d1a22;
+      --panel-2: #101f28;
+      --panel-3: #13242e;
+      --border: #20333e;
+      --border-strong: #2b4654;
+      --text: #eef7fa;
+      --text-soft: #bed0d7;
+      --muted: #7f98a3;
+      --muted-2: #5f7782;
+      --accent: #55d8ed;
+      --accent-soft: rgba(85, 216, 237, 0.12);
+      --success: #5bd48a;
+      --success-soft: rgba(91, 212, 138, 0.12);
+      --warning: #f5b85b;
+      --warning-soft: rgba(245, 184, 91, 0.12);
+      --danger: #f2747e;
+      --danger-soft: rgba(242, 116, 126, 0.12);
+      --power: #f2747e;
+      --ground: #7f98a3;
+      --radius-lg: 18px;
+      --radius-md: 13px;
+      --radius-sm: 9px;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% -20%, rgba(85, 216, 237, 0.10), transparent 38rem),
+        linear-gradient(180deg, #071015 0%, #060d12 100%);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.16;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black, transparent 72%);
+    }
+
+    button, input, select { font: inherit; }
+    button { border: 0; -webkit-tap-highlight-color: transparent; }
+    a { color: inherit; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    /* ---------- header ---------- */
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      border-bottom: 1px solid rgba(43, 70, 84, 0.76);
+      background: rgba(7, 16, 21, 0.86);
+      backdrop-filter: blur(16px) saturate(120%);
+    }
+
+    .header-inner {
+      width: min(1440px, calc(100% - 40px));
+      min-height: 68px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 30px;
+      border-radius: 9px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid rgba(85, 216, 237, 0.28);
+    }
+
+    .brand-mark svg { width: 22px; height: 22px; }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 15px;
+      border-radius: var(--radius-sm);
+      background: var(--panel-2);
+      border: 1px solid var(--border-strong);
+      color: var(--text-soft);
+      font-size: 0.86rem;
+      font-weight: 560;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .button:hover { background: var(--panel-3); color: var(--text); }
+    .button svg { width: 17px; height: 17px; }
+    .button.primary { background: var(--accent-soft); border-color: rgba(85, 216, 237, 0.4); color: var(--accent); }
+    .button.primary:hover { background: rgba(85, 216, 237, 0.2); }
+    .button.danger { color: var(--danger); border-color: rgba(242, 116, 126, 0.35); }
+    .button.danger:hover { background: var(--danger-soft); }
+    .button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .button.small { padding: 6px 11px; font-size: 0.79rem; }
+
+    /* ---------- layout ---------- */
+
+    .layout {
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 30px 0 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .page-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+
+    .eyebrow {
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    h1 { margin: 0; font-size: 1.7rem; font-weight: 640; letter-spacing: -0.01em; }
+    h2 { margin: 0; font-size: 1.02rem; font-weight: 620; }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel) 0%, rgba(10, 21, 28, 0.94) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(16, 31, 40, 0.5);
+    }
+
+    .panel-head p { margin: 4px 0 0; font-size: 0.83rem; color: var(--muted); }
+    .panel-body { padding: 20px; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 560;
+      border: 1px solid var(--border-strong);
+      background: var(--panel-2);
+      color: var(--text-soft);
+      white-space: nowrap;
+    }
+
+    .chip.ok { color: var(--success); background: var(--success-soft); border-color: rgba(91, 212, 138, 0.32); }
+    .chip.warn { color: var(--warning); background: var(--warning-soft); border-color: rgba(245, 184, 91, 0.32); }
+    .chip.bad { color: var(--danger); background: var(--danger-soft); border-color: rgba(242, 116, 126, 0.32); }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .dot.pulse { animation: pulse 1.6s ease-in-out infinite; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .notice {
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(245, 184, 91, 0.32);
+      background: var(--warning-soft);
+      color: var(--warning);
+      font-size: 0.87rem;
+    }
+
+    .notice.bad { border-color: rgba(242, 116, 126, 0.32); background: var(--danger-soft); color: var(--danger); }
+    .notice[hidden] { display: none; }
+
+    /* ---------- identify panel ---------- */
+
+    .identify {
+      display: grid;
+      grid-template-columns: minmax(260px, 340px) 1fr;
+      gap: 22px;
+    }
+
+    .identify-readout {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      min-height: 190px;
+      padding: 22px;
+      border-radius: var(--radius-md);
+      border: 1px dashed var(--border-strong);
+      background: var(--panel-2);
+      text-align: center;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .identify-readout.hit {
+      border-style: solid;
+      border-color: rgba(85, 216, 237, 0.5);
+      background: var(--accent-soft);
+    }
+
+    .identify-gpio { font-size: 2.9rem; font-weight: 680; letter-spacing: -0.02em; line-height: 1; font-family: var(--mono); }
+    .identify-sub { font-size: 0.85rem; color: var(--muted); }
+    .identify-hint { font-size: 0.9rem; color: var(--text-soft); max-width: 24ch; }
+
+    .recent { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+
+    .recent-row {
+      display: grid;
+      grid-template-columns: 92px 68px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 9px 13px;
+      border-radius: var(--radius-sm);
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      font-size: 0.83rem;
+    }
+
+    .recent-row .mono { font-family: var(--mono); color: var(--text); }
+    .recent-row .when { color: var(--muted-2); font-size: 0.78rem; font-family: var(--mono); }
+    .recent-empty { padding: 22px; text-align: center; color: var(--muted); font-size: 0.86rem; }
+
+    /* ---------- header pin map ---------- */
+
+    .pinmap {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 6px 10px;
+      align-items: center;
+    }
+
+    .pinmap-spine {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      width: 3px;
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(180deg, transparent, var(--border-strong) 8%, var(--border-strong) 92%, transparent);
+    }
+
+    .pin {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      font-size: 0.82rem;
+      transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+    }
+
+    .pin.left { flex-direction: row-reverse; text-align: right; }
+    .pin.left .pin-info { align-items: flex-end; }
+
+    .pin-num {
+      flex: none;
+      width: 26px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--muted-2);
+      border-radius: 5px;
+      padding: 2px 0;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .pin-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+    .pin-label { font-weight: 580; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pin-meta { font-size: 0.7rem; color: var(--muted-2); font-family: var(--mono); }
+
+    .pin-level {
+      flex: none;
+      min-width: 46px;
+      text-align: center;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 620;
+      font-family: var(--mono);
+      letter-spacing: 0.04em;
+      border: 1px solid var(--border-strong);
+      color: var(--muted);
+    }
+
+    .pin.gpio.high .pin-level { color: var(--success); background: var(--success-soft); border-color: rgba(91, 212, 138, 0.3); }
+    .pin.gpio.low .pin-level { color: var(--warning); background: var(--warning-soft); border-color: rgba(245, 184, 91, 0.3); }
+    .pin.gpio.low { border-color: rgba(245, 184, 91, 0.45); background: rgba(245, 184, 91, 0.07); }
+
+    .pin.power { border-color: rgba(242, 116, 126, 0.28); background: rgba(242, 116, 126, 0.06); }
+    .pin.power .pin-label { color: var(--power); }
+    .pin.ground { opacity: 0.6; }
+    .pin.unavailable { opacity: 0.45; border-style: dashed; }
+    .pin.bound { border-color: rgba(85, 216, 237, 0.5); }
+    .pin.bound .pin-label { color: var(--accent); }
+
+    .pin.flash { animation: flash 0.55s ease-out; }
+
+    @keyframes flash {
+      0% { background: rgba(85, 216, 237, 0.42); border-color: var(--accent); transform: scale(1.035); }
+      100% { background: var(--panel-2); border-color: var(--border); transform: scale(1); }
+    }
+
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; font-size: 0.76rem; color: var(--muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { width: 11px; height: 11px; border-radius: 3px; }
+
+    /* ---------- controls ---------- */
+
+    .controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+
+    .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    .field > label { font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+
+    input[type="text"], input[type="number"], select {
+      padding: 8px 11px;
+      border-radius: var(--radius-sm);
+      background: var(--panel-3);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-size: 0.86rem;
+      min-width: 0;
+    }
+
+    input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+
+    .check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--text-soft); cursor: pointer; }
+
+    /* ---------- bindings ---------- */
+
+    .bindings { display: flex; flex-direction: column; gap: 14px; }
+
+    .binding {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--panel-2);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .binding.pressed { border-color: rgba(85, 216, 237, 0.55); background: rgba(85, 216, 237, 0.07); }
+    .binding-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .binding-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .binding-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted-2); }
+    .binding-foot .err { color: var(--danger); }
+
+    .empty { padding: 30px; text-align: center; color: var(--muted); font-size: 0.88rem; }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 60;
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      background: var(--panel-3);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-size: 0.86rem;
+      box-shadow: var(--shadow);
+      max-width: min(420px, calc(100% - 40px));
+    }
+
+    .toast.ok { border-color: rgba(91, 212, 138, 0.45); color: var(--success); }
+    .toast.bad { border-color: rgba(242, 116, 126, 0.45); color: var(--danger); }
+    .toast[hidden] { display: none; }
+
+    @media (max-width: 900px) {
+      .identify { grid-template-columns: 1fr; }
+      .pinmap { grid-template-columns: 1fr; }
+      .pinmap-spine { display: none; }
+      .pin.left { flex-direction: row; text-align: left; }
+      .pin.left .pin-info { align-items: flex-start; }
+    }
+
+    @media (max-width: 640px) {
+      .layout, .header-inner { width: calc(100% - 24px); }
+      .recent-row { grid-template-columns: 80px 1fr; row-gap: 4px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pin.flash, .dot.pulse { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="Back to relay overview">
+        <span class="brand-mark" aria-hidden="true">
+         <svg viewBox="0 0 64 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M35 6L21 22h8l-4 12 14-16h-8l4-12z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
+
+        </span>
+        Shelly Relay
+      </a>
+
+      <div class="header-actions">
+        <span class="chip" id="stream-chip"><span class="dot"></span><span id="stream-text">Connecting…</span></span>
+        <a class="button" href="/">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Relay overview</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="page-heading">
+      <div>
+        <span class="eyebrow">Hardware</span>
+        <h1>GPIO &amp; physical buttons</h1>
+      </div>
+      <div class="header-actions">
+        <span class="chip" id="chip-info">—</span>
+        <button class="button" id="reset-counters" type="button">Reset counters</button>
+      </div>
+    </section>
+
+    <div class="notice bad" id="gpio-warning" hidden></div>
+
+    <!-- ---------- identify ---------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Identify a button</h2>
+          <p>Press a button on your board. The pin it is wired to shows up here.</p>
+        </div>
+        <button class="button small" id="clear-recent" type="button">Clear list</button>
+      </div>
+      <div class="panel-body identify">
+        <div class="identify-readout" id="readout">
+          <div class="identify-hint" id="readout-hint">Waiting for an edge — press and hold a button.</div>
+        </div>
+        <div>
+          <div class="recent" id="recent"></div>
+          <div class="recent-empty" id="recent-empty">Nothing detected yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- pin map ---------- -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>40-pin header</h2>
+          <p>Live electrical level of every line, oriented as the board sits with the USB ports toward you.</p>
+        </div>
+        <div class="controls">
+          <div class="field">
+            <label for="bias-all">Bias all pins</label>
+            <select id="bias-all">
+              <option value="pull-up">Pull-up (buttons to GND)</option>
+              <option value="pull-down">Pull-down (buttons to 3V3)</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="debounce-all">Debounce (ms)</label>
+            <input type="number" id="debounce-all" min="0" max="2000" step="5" value="20" style="width:110px">
+          </div>
+          <button class="button primary" id="apply-bias" type="button">Apply</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="pinmap" id="pinmap"><div class="pinmap-spine"></div></div>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--success)"></i> High (3V3)</span>
+          <span><i class="swatch" style="background:var(--warning)"></i> Low (0V)</span>
+          <span><i class="swatch" style="background:var(--accent)"></i> Bound to a relay</span>
+          <span><i class="swatch" style="background:var(--power)"></i> Power</span>
+          <span><i class="swatch" style="background:var(--ground)"></i> Ground</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- bindings ---------- -->
+    <section class="panel" id="bindings-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Button bindings</h2>
+          <p>Map a pin to a relay and choose how the button behaves.</p>
+        </div>
+        <div class="header-actions">
+          <button class="button" id="add-binding" type="button">Add binding</button>
+          <button class="button primary" id="save-bindings" type="button">Save bindings</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="bindings" id="bindings"></div>
+        <div class="empty" id="bindings-empty">No bindings yet. Identify a pin above, then add one.</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script>
+    "use strict";
+
+    const MODE_LABELS = {
+      toggle: "Toggle on each press",
+      momentary: "On while held, off on release",
+      momentary_inverse: "Off while held, on on release",
+      on: "Switch on at every press",
+      off: "Switch off at every press",
+    };
+
+    const state = {
+      header: [],
+      pins: new Map(),      // gpio -> PinState
+      devices: [],
+      modes: [],
+      bindings: [],         // working copy, edited in place
+      statusById: new Map(),
+      recent: [],
+      available: false,
+      dirty: false,
+    };
+
+    const el = (id) => document.getElementById(id);
+
+    function toast(message, kind) {
+      const node = el("toast");
+      node.textContent = message;
+      node.className = "toast" + (kind ? " " + kind : "");
+      node.hidden = false;
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => { node.hidden = true; }, 4000);
+    }
+
+    async function api(path, options) {
+      const opts = Object.assign({ headers: {} }, options || {});
+      if (opts.method && opts.method !== "GET") {
+        opts.headers["X-Shelly-Control"] = "1";
+        opts.headers["Content-Type"] = "application/json";
+      }
+      const res = await fetch(path, opts);
+      const text = await res.text();
+      let body = null;
+      if (text) {
+        try { body = JSON.parse(text); } catch (_) { body = { error: text }; }
+      }
+      if (!res.ok) {
+        throw new Error((body && body.error) || ("HTTP " + res.status));
+      }
+      return body;
+    }
+
+    /* ---------- pin map ---------- */
+
+    function buildPinMap() {
+      const map = el("pinmap");
+      map.innerHTML = '<div class="pinmap-spine"></div>';
+
+      for (const pin of state.header) {
+        const node = document.createElement("div");
+        const left = pin.pin % 2 === 1;
+        node.className = "pin " + pin.kind + (left ? " left" : " right");
+        node.style.gridColumn = left ? "1" : "3";
+        node.style.gridRow = String(Math.ceil(pin.pin / 2));
+        node.id = "pin-" + pin.pin;
+        if (pin.kind === "gpio") node.dataset.gpio = String(pin.gpio);
+        if (pin.note) node.title = pin.note;
+
+        const num = document.createElement("span");
+        num.className = "pin-num";
+        num.textContent = pin.pin;
+
+        const info = document.createElement("span");
+        info.className = "pin-info";
+        const label = document.createElement("span");
+        label.className = "pin-label";
+        label.textContent = pin.label;
+        const meta = document.createElement("span");
+        meta.className = "pin-meta";
+        meta.textContent = pin.kind === "gpio" ? "BCM " + pin.gpio : "";
+        info.append(label, meta);
+
+        node.append(num, info);
+
+        if (pin.kind === "gpio") {
+          const level = document.createElement("span");
+          level.className = "pin-level";
+          level.textContent = "—";
+          node.append(level);
+          node.style.cursor = "pointer";
+          node.addEventListener("click", () => addBinding(pin.gpio));
+        }
+        map.append(node);
+      }
+      paintPins();
+    }
+
+    function paintPins() {
+      const bound = new Set(state.bindings.filter((b) => b.enabled).map((b) => Number(b.gpio)));
+      for (const pin of state.header) {
+        if (pin.kind !== "gpio") continue;
+        const node = el("pin-" + pin.pin);
+        if (!node) continue;
+        const info = state.pins.get(pin.gpio);
+        const levelNode = node.querySelector(".pin-level");
+
+        node.classList.toggle("bound", bound.has(pin.gpio));
+        node.classList.remove("high", "low", "unavailable");
+
+        if (!info || !info.available) {
+          node.classList.add("unavailable");
+          levelNode.textContent = "n/a";
+          node.title = (info && info.error) || pin.note || "not claimed";
+          continue;
+        }
+        node.classList.add(info.level === 1 ? "high" : "low");
+        levelNode.textContent = info.level === 1 ? "HIGH" : "LOW";
+
+        const parts = ["BCM " + pin.gpio, "bias " + info.bias, info.debounce_ms + "ms debounce", info.changes + " edges"];
+        if (pin.note) parts.push(pin.note);
+        node.title = parts.join(" · ");
+
+        const meta = node.querySelector(".pin-meta");
+        meta.textContent = "BCM " + pin.gpio + (info.changes ? " · " + info.changes : "");
+      }
+    }
+
+    function flashPin(gpio) {
+      const pin = state.header.find((p) => p.kind === "gpio" && p.gpio === gpio);
+      if (!pin) return;
+      const node = el("pin-" + pin.pin);
+      if (!node) return;
+      node.classList.remove("flash");
+      void node.offsetWidth; // restart the animation
+      node.classList.add("flash");
+    }
+
+    /* ---------- identify ---------- */
+
+    function physicalPinFor(gpio) {
+      const pin = state.header.find((p) => p.kind === "gpio" && p.gpio === gpio);
+      return pin ? pin.pin : 0;
+    }
+
+    function renderReadout(evt) {
+      const readout = el("readout");
+      readout.classList.add("hit");
+      readout.innerHTML = "";
+
+      const big = document.createElement("div");
+      big.className = "identify-gpio";
+      big.textContent = "GPIO " + evt.gpio;
+
+      const sub = document.createElement("div");
+      sub.className = "identify-sub";
+      sub.textContent = "physical pin " + physicalPinFor(evt.gpio) +
+        " · " + (evt.level === 1 ? "released / high" : "pressed / low");
+
+      const action = document.createElement("button");
+      action.className = "button primary small";
+      action.type = "button";
+      action.textContent = "Bind GPIO " + evt.gpio + " to a relay";
+      action.addEventListener("click", () => addBinding(evt.gpio));
+
+      readout.append(big, sub, action);
+    }
+
+    function renderRecent() {
+      const list = el("recent");
+      list.innerHTML = "";
+      el("recent-empty").hidden = state.recent.length > 0;
+
+      for (const evt of state.recent) {
+        const row = document.createElement("div");
+        row.className = "recent-row";
+
+        const gpio = document.createElement("span");
+        gpio.className = "mono";
+        gpio.textContent = "GPIO " + evt.gpio;
+
+        const phys = document.createElement("span");
+        phys.className = "when";
+        phys.textContent = "pin " + physicalPinFor(evt.gpio);
+
+        const edge = document.createElement("span");
+        edge.className = "chip " + (evt.level === 1 ? "ok" : "warn");
+        edge.style.justifySelf = "start";
+        edge.textContent = evt.level === 1 ? "rising → HIGH" : "falling → LOW";
+
+        const when = document.createElement("span");
+        when.className = "when";
+        when.textContent = new Date(evt.at).toLocaleTimeString();
+
+        row.append(gpio, phys, edge, when);
+        list.append(row);
+      }
+    }
+
+    function recordEvent(evt) {
+      state.recent.unshift(evt);
+      if (state.recent.length > 40) state.recent.pop();
+      renderReadout(evt);
+      renderRecent();
+    }
+
+    /* ---------- bindings ---------- */
+
+    function blankBinding(gpio) {
+      const used = new Set(state.bindings.map((b) => b.id));
+      let n = 1;
+      while (used.has("btn" + n)) n++;
+      return {
+        id: "btn" + n,
+        name: "Button " + n,
+        gpio: typeof gpio === "number" ? gpio : (state.pins.size ? state.pins.keys().next().value : 17),
+        device_id: state.devices.length ? state.devices[0].id : "",
+        switch_id: 0,
+        mode: "toggle",
+        active_low: true,
+        enabled: true,
+        bias: "pull-up",
+        debounce_ms: 25,
+      };
+    }
+
+    function addBinding(gpio) {
+      if (!state.available) {
+        toast("GPIO is not available on this host", "bad");
+        return;
+      }
+      if (!state.devices.length) {
+        toast("Configure a Shelly device first", "bad");
+        return;
+      }
+      state.bindings.push(blankBinding(gpio));
+      state.dirty = true;
+      renderBindings();
+      el("bindings-panel").scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    function field(labelText, control) {
+      const wrap = document.createElement("div");
+      wrap.className = "field";
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const id = "f" + Math.random().toString(36).slice(2, 9);
+      label.htmlFor = id;
+      control.id = id;
+      wrap.append(label, control);
+      return wrap;
+    }
+
+    function select(options, value, onChange) {
+      const node = document.createElement("select");
+      for (const opt of options) {
+        const o = document.createElement("option");
+        o.value = opt.value;
+        o.textContent = opt.label;
+        node.append(o);
+      }
+      node.value = value;
+      node.addEventListener("change", () => { onChange(node.value); state.dirty = true; });
+      return node;
+    }
+
+    function textInput(value, onChange, type, attrs) {
+      const node = document.createElement("input");
+      node.type = type || "text";
+      node.value = value;
+      Object.assign(node, attrs || {});
+      node.addEventListener("input", () => { onChange(node.value); state.dirty = true; });
+      return node;
+    }
+
+    function renderBindings() {
+      const list = el("bindings");
+      list.innerHTML = "";
+      el("bindings-empty").hidden = state.bindings.length > 0;
+
+      state.bindings.forEach((b, index) => {
+        const status = state.statusById.get(b.id);
+        const card = document.createElement("div");
+        card.className = "binding" + (status && status.pressed ? " pressed" : "");
+
+        /* --- top row --- */
+        const top = document.createElement("div");
+        top.className = "binding-top";
+
+        const title = document.createElement("div");
+        title.style.display = "flex";
+        title.style.alignItems = "center";
+        title.style.gap = "10px";
+        title.style.flexWrap = "wrap";
+
+        const pressedChip = document.createElement("span");
+        pressedChip.className = "chip " + (status && status.pressed ? "ok" : "");
+        pressedChip.innerHTML = '<span class="dot"></span>';
+        pressedChip.append(status && status.pressed ? "Pressed" : "Idle");
+
+        const pinChip = document.createElement("span");
+        pinChip.className = "chip";
+        pinChip.textContent = "GPIO " + b.gpio + " · pin " + physicalPinFor(Number(b.gpio));
+
+        title.append(pressedChip, pinChip);
+
+        const actions = document.createElement("div");
+        actions.className = "header-actions";
+
+        const enabled = document.createElement("label");
+        enabled.className = "check";
+        const enabledBox = document.createElement("input");
+        enabledBox.type = "checkbox";
+        enabledBox.checked = !!b.enabled;
+        enabledBox.addEventListener("change", () => {
+          b.enabled = enabledBox.checked;
+          state.dirty = true;
+          paintPins();
+        });
+        enabled.append(enabledBox, document.createTextNode("Enabled"));
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "button danger small";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () => {
+          state.bindings.splice(index, 1);
+          state.dirty = true;
+          renderBindings();
+          paintPins();
+        });
+
+        actions.append(enabled, remove);
+        top.append(title, actions);
+
+        /* --- fields --- */
+        const grid = document.createElement("div");
+        grid.className = "binding-grid";
+
+        grid.append(field("Name", textInput(b.name, (v) => { b.name = v; })));
+        grid.append(field("ID", textInput(b.id, (v) => { b.id = v; })));
+
+        const gpioOptions = state.header
+          .filter((p) => p.kind === "gpio")
+          .sort((a, c) => a.gpio - c.gpio)
+          .map((p) => ({ value: String(p.gpio), label: "GPIO " + p.gpio + " (pin " + p.pin + ")" }));
+        grid.append(field("Pin", select(gpioOptions, String(b.gpio), (v) => {
+          b.gpio = Number(v);
+          renderBindings();
+          paintPins();
+        })));
+
+        grid.append(field("Relay", select(
+          state.devices.map((d) => ({ value: d.id, label: d.name || d.id })),
+          b.device_id,
+          (v) => { b.device_id = v; }
+        )));
+
+        grid.append(field("Switch", textInput(b.switch_id, (v) => { b.switch_id = Number(v) || 0; }, "number", { min: 0, max: 15 })));
+
+        grid.append(field("Behaviour", select(
+          state.modes.map((m) => ({ value: m, label: MODE_LABELS[m] || m })),
+          b.mode,
+          (v) => { b.mode = v; }
+        )));
+
+        grid.append(field("Wiring", select([
+          { value: "true", label: "Active low (to GND)" },
+          { value: "false", label: "Active high (to 3V3)" },
+        ], String(!!b.active_low), (v) => { b.active_low = v === "true"; })));
+
+        grid.append(field("Bias", select([
+          { value: "pull-up", label: "Pull-up" },
+          { value: "pull-down", label: "Pull-down" },
+          { value: "disabled", label: "Disabled" },
+        ], b.bias || "pull-up", (v) => { b.bias = v; })));
+
+        grid.append(field("Debounce ms", textInput(b.debounce_ms, (v) => { b.debounce_ms = Number(v) || 0; }, "number", { min: 0, max: 2000, step: 5 })));
+
+        /* --- footer --- */
+        const foot = document.createElement("div");
+        foot.className = "binding-foot";
+
+        const left = document.createElement("span");
+        if (status && status.last_fired) {
+          left.textContent = "Last: " + (status.last_action || "—") +
+            " at " + new Date(status.last_fired).toLocaleTimeString() +
+            " · " + status.fires + " total";
+        } else {
+          left.textContent = "Not triggered yet";
+        }
+
+        const right = document.createElement("span");
+        if (status && status.last_error) {
+          right.className = "err";
+          right.textContent = status.last_error;
+        } else if (status && !status.pin_ok) {
+          right.className = "err";
+          right.textContent = "pin not claimed";
+        }
+
+        foot.append(left, right);
+        card.append(top, grid, foot);
+        list.append(card);
+      });
+    }
+
+    async function saveBindings() {
+      const button = el("save-bindings");
+      button.disabled = true;
+      try {
+        const payload = state.bindings.map((b) => ({
+          id: String(b.id).trim(),
+          name: String(b.name).trim(),
+          gpio: Number(b.gpio),
+          device_id: b.device_id,
+          switch_id: Number(b.switch_id) || 0,
+          mode: b.mode,
+          active_low: !!b.active_low,
+          enabled: !!b.enabled,
+          bias: b.bias || "pull-up",
+          debounce_ms: Number(b.debounce_ms) || 0,
+        }));
+        const body = await api("/api/bindings", { method: "PUT", body: JSON.stringify({ bindings: payload }) });
+        applyBindings(body);
+        state.dirty = false;
+        toast("Bindings saved", "ok");
+        await refreshPins();
+      } catch (err) {
+        toast("Save failed: " + err.message, "bad");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function applyBindings(body) {
+      state.devices = body.devices || [];
+      state.modes = body.modes || [];
+      state.statusById = new Map((body.bindings || []).map((b) => [b.id, b]));
+      state.bindings = (body.bindings || []).map((b) => ({
+        id: b.id, name: b.name, gpio: b.gpio, device_id: b.device_id,
+        switch_id: b.switch_id, mode: b.mode, active_low: b.active_low,
+        enabled: b.enabled, bias: b.bias, debounce_ms: b.debounce_ms,
+      }));
+      renderBindings();
+      paintPins();
+    }
+
+    /* ---------- loading & streaming ---------- */
+
+    async function refreshPins() {
+      const body = await api("/api/gpio");
+      state.header = body.header || [];
+      state.available = !!body.available;
+      state.pins = new Map((body.pins || []).map((p) => [p.gpio, p]));
+
+      const warning = el("gpio-warning");
+      warning.hidden = state.available;
+      if (!state.available) {
+        warning.textContent = "GPIO is unavailable: " + (body.reason || "unknown reason") +
+          ". Pin levels and physical buttons are inactive.";
+      }
+
+      el("chip-info").textContent = state.available
+        ? body.chip + " · " + state.pins.size + " lines"
+        : "no GPIO";
+
+      if (!el("pinmap").querySelector(".pin")) buildPinMap();
+      else paintPins();
+
+      if (!state.recent.length && Array.isArray(body.history) && body.history.length) {
+        state.recent = body.history.slice(-40).reverse();
+        renderRecent();
+      }
+    }
+
+    function setStreamState(kind, text) {
+      const chip = el("stream-chip");
+      chip.className = "chip " + kind;
+      chip.querySelector(".dot").classList.toggle("pulse", kind === "ok");
+      el("stream-text").textContent = text;
+    }
+
+    let streamRetry = 1000;
+
+    function connectStream() {
+      const source = new EventSource("/api/gpio/stream");
+
+      source.addEventListener("open", () => {
+        streamRetry = 1000;
+        setStreamState("ok", "Live");
+      });
+
+      source.addEventListener("edge", (message) => {
+        let evt;
+        try { evt = JSON.parse(message.data); } catch (_) { return; }
+
+        const pin = state.pins.get(evt.gpio);
+        if (pin) {
+          pin.level = evt.level;
+          pin.changes = (pin.changes || 0) + 1;
+          pin.last_change = evt.at;
+        }
+        flashPin(evt.gpio);
+        paintPins();
+        recordEvent(evt);
+        markPressedBindings(evt);
+      });
+
+      source.addEventListener("error", () => {
+        source.close();
+        setStreamState("bad", "Reconnecting…");
+        setTimeout(connectStream, streamRetry);
+        streamRetry = Math.min(streamRetry * 2, 15000);
+      });
+    }
+
+    // Reflect press state immediately rather than waiting for the next poll.
+    function markPressedBindings(evt) {
+      let touched = false;
+      for (const b of state.bindings) {
+        if (Number(b.gpio) !== evt.gpio) continue;
+        const status = state.statusById.get(b.id) || { id: b.id };
+        status.pressed = b.active_low ? evt.level === 0 : evt.level === 1;
+        state.statusById.set(b.id, status);
+        touched = true;
+      }
+      if (touched) renderBindings();
+    }
+
+    async function refreshBindingStatus() {
+      if (state.dirty) return; // never clobber unsaved edits
+      try {
+        const body = await api("/api/bindings");
+        applyBindings(body);
+      } catch (_) { /* transient, the next tick retries */ }
+    }
+
+    /* ---------- wiring ---------- */
+
+    el("apply-bias").addEventListener("click", async () => {
+      const button = el("apply-bias");
+      button.disabled = true;
+      try {
+        const body = await api("/api/gpio/config", {
+          method: "POST",
+          body: JSON.stringify({
+            all: true,
+            bias: el("bias-all").value,
+            debounce_ms: Number(el("debounce-all").value) || 0,
+          }),
+        });
+        state.pins = new Map((body.pins || []).map((p) => [p.gpio, p]));
+        paintPins();
+        const failed = body.failures ? Object.keys(body.failures).length : 0;
+        toast(failed ? "Applied, " + failed + " line(s) failed" : "Applied to all lines", failed ? "bad" : "ok");
+      } catch (err) {
+        toast("Failed: " + err.message, "bad");
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    el("reset-counters").addEventListener("click", async () => {
+      try {
+        const body = await api("/api/gpio/reset", { method: "POST", body: "{}" });
+        state.pins = new Map((body.pins || []).map((p) => [p.gpio, p]));
+        state.recent = [];
+        renderRecent();
+        paintPins();
+        toast("Counters reset", "ok");
+      } catch (err) {
+        toast("Failed: " + err.message, "bad");
+      }
+    });
+
+    el("clear-recent").addEventListener("click", () => {
+      state.recent = [];
+      renderRecent();
+      const readout = el("readout");
+      readout.classList.remove("hit");
+      readout.innerHTML = '<div class="identify-hint">Waiting for an edge — press and hold a button.</div>';
+    });
+
+    el("add-binding").addEventListener("click", () => addBinding());
+    el("save-bindings").addEventListener("click", saveBindings);
+
+    window.addEventListener("beforeunload", (e) => {
+      if (state.dirty) { e.preventDefault(); e.returnValue = ""; }
+    });
+
+    (async function init() {
+      try {
+        await refreshPins();
+        await refreshBindingStatus();
+      } catch (err) {
+        toast("Load failed: " + err.message, "bad");
+      }
+      if (state.available) {
+        connectStream();
+      } else {
+        setStreamState("bad", "GPIO off");
+      }
+      setInterval(refreshPins, 5000);
+      setInterval(refreshBindingStatus, 5000);
+    })();
+  </script>
+</body>
+</html>
